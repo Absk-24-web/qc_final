@@ -1,11 +1,14 @@
+import sun.awt.X11.XSystemTrayPeer;
+
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.Border;
+import javax.swing.event.AncestorListener;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
@@ -28,11 +31,16 @@ public class QualityCheckUserInterface1 {
     private JTextField confidencetxt;
     private JTextField txt;
     private boolean stop;
+    private boolean selected;
+    JCheckBox checkBox;
     private static Service service;
     public PrintWriter output = null;
     public InputStreamReader in = null;
-    private String x, s;
-    public JPanel panel;
+    private String x;
+    private String s;
+    private String task;
+    private JPanel panel;
+    private  JTextField textField;
 
     //Frame
     JFrame frame;
@@ -46,13 +54,14 @@ public class QualityCheckUserInterface1 {
     public QualityCheckUserInterface1() {
         // TODO Auto-generated constructor stub
         service = new Service();
-
     }
 
 
     public static void main(String args[]) throws IOException {
         QualityCheckUserInterface1 quality = new QualityCheckUserInterface1();
         quality.mainFrame();
+        //quality.ocrFrame();
+        //quality.patternFrame();
 
     }
 
@@ -72,13 +81,14 @@ public class QualityCheckUserInterface1 {
         panel.setLayout(new FlowLayout(10, 40, 50));
 
 
-        JButton button = new JButton("Color");
+        final JButton button = new JButton("Color");
         button.setPreferredSize(new Dimension(150, 50));
         button.setMaximumSize(button.getPreferredSize());
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 try {
+                    task = "RUN|CLR";
                     colorFrame();
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -92,6 +102,7 @@ public class QualityCheckUserInterface1 {
         button1.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
+                task = "RUN|CIR";
                 circleFrame();
             }
         });
@@ -102,7 +113,8 @@ public class QualityCheckUserInterface1 {
         button2.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-
+                // barFrame.BarFrame();
+                task = "RUN|BCR";
                 BarFrame();
             }
         });
@@ -114,6 +126,7 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 try {
+                    task = "RUN|PAT";
                     patternFrame();
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -128,6 +141,7 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 try {
+                    task= "RUN|OCR";
                     ocrFrame();
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -163,7 +177,7 @@ public class QualityCheckUserInterface1 {
     }
 
     //color Frame
-    public void colorFrame() throws IOException {
+    public void colorFrame() throws IOException{
         Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
         frame = new JFrame("Color");
         frame.setLayout(null);
@@ -173,7 +187,7 @@ public class QualityCheckUserInterface1 {
                 d.height / 2 - frame.getSize().height / 2);
         frame.getDefaultCloseOperation();
 
-        final JPanel panel = new JPanel();
+        panel = new JPanel();
         panel.setBounds(0, 0, 770, 575);
         panel.setLayout(null);
 
@@ -278,71 +292,7 @@ public class QualityCheckUserInterface1 {
         getImage.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                //send
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("SEND");
-                } catch (UnknownHostException ex) {
-                    ex.printStackTrace();
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-                //receive in new thread
-                Thread readImage3 = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            byte[] contents = new byte[MAX_SIZE];
-                            int idx = 0;
-
-                            do {
-                                img = null;
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-//                    System.out.println("\nEnd"+contents.length);
-                                    //System.out.print("return");
-                                    return;
-                                }
-
-                                if (ch == ',') {
-                                    //System.out.println("EOI");
-                                    contents[idx] = '\0';
-                                    byte[] imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(new String(contents));
-                                    img = ImageIO.read(new ByteArrayInputStream(imageBytes));
-                                    img2 = deepCopy(img);
-                                    colorImagePanel = new ColorImagePanel(img);
-                                    colorImagePanel.setBounds(5, 5, 640, 480);
-                                    colorImagePanel.setBorder(border);
-                                    colorImagePanel.setForeground(Color.black);
-                                    panel.add(colorImagePanel);
-                                    colorImagePanel.revalidate();
-                                    colorImagePanel.repaint();
-                                    //label.getGraphics().drawImage(img, 0, 0, null);
-                                    idx = 0;
-                                    //System.out.println("saved " + count);//displayImage()
-                                } else {
-                                    contents[idx] = (byte) ch;
-                                    idx++;
-                                }
-                                if (img != null) {
-                                    break;
-                                }
-                            } while (true);
-                        } catch (UnknownHostException ex) {
-                            ex.printStackTrace();
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-
-                    }
-
-                });
-                readImage3.start();
+                    getColorImage();
             }
 
         });
@@ -363,63 +313,18 @@ public class QualityCheckUserInterface1 {
                 } else if (service.client == null) {
                     JOptionPane.showMessageDialog(frame, "Connection Error");
                 } else {
-                    JOptionPane.showMessageDialog(frame, "Please make sure set the bound");
+                    JOptionPane.showMessageDialog(frame, "Please make sure set the bounds");
                 }
-
 
             }
         });
 
-        JButton run = new JButton("Run");
+        final JButton run = new JButton("Run");
         run.setBounds(665, 120, 70, 30);
         run.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = false;
-                //send
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("RUN|CLR");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                //receive in new thread
-                Thread readMessage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            String contents = "";
-                            do {
-                                if (stop == true) {
-                                    break;
-                                }
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-                                    System.out.print("return");
-                                    return;
-                                }
-                                if (ch == '|') {
-                                    System.out.println("Location: " + contents);//displayLocation()
-                                    contents = "";
-                                } else {
-                                    char c = (char) ch;
-                                    contents = contents + c;
-                                }
-
-                            } while (true);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                readMessage.start();
-
+               getRun();
             }
         });
 
@@ -428,14 +333,8 @@ public class QualityCheckUserInterface1 {
         stopb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = true;
-                //send
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("STOP");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                sendStop();
+
             }
         });
 
@@ -449,18 +348,10 @@ public class QualityCheckUserInterface1 {
         });
 
 
-        panel.add(sliderHu);
-        panel.add(sliderHl);
-        panel.add(sliderSu);
-        panel.add(sliderSl);
-        panel.add(sliderLu);
-        panel.add(sliderLl);
-        panel.add(label2);
-        panel.add(label3);
-        panel.add(label4);
-        panel.add(label5);
-        panel.add(label6);
-        panel.add(label7);
+        panel.add(sliderHu);panel.add(sliderHl);panel.add(sliderSu);
+        panel.add(sliderSl);panel.add(sliderLu);panel.add(sliderLl);
+        panel.add(label2);panel.add(label3);panel.add(label4);
+        panel.add(label5);panel.add(label6);panel.add(label7);
         panel.add(send);
         panel.add(label1);
         panel.add(getImage);
@@ -470,7 +361,6 @@ public class QualityCheckUserInterface1 {
         frame.add(panel);
         frame.setVisible(true);
         frame.setEnabled(true);
-
     }
 
 
@@ -505,83 +395,7 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 label1.disable();
-                //send
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("SEND");
-
-                } catch (
-                        UnknownHostException ex) {
-                    ex.printStackTrace();
-                } catch (
-                        IOException ex) {
-                    ex.printStackTrace();
-                }
-                //receive image in new thread
-                Thread readImage2 = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-
-                            byte[] contents = new byte[MAX_SIZE];
-                            int idx = 0;
-
-                            do {
-                                img = null;
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-//                    System.out.println("\nEnd"+contents.length);
-                                    // System.out.print("return");
-                                    return;
-                                }
-
-                                if (ch == ',') {
-                                    //System.out.println("EOI");
-                                    contents[idx] = '\0';
-                                    byte[] imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(new String(contents));
-                                    img = ImageIO.read(new ByteArrayInputStream(imageBytes));
-                                    ImageIO.write(img, "jpg", new File("/home/ur/Desktop/NEW ur cap/check/src/main/resources/out.jpg"));
-                                    if (imagePanel == null) {
-                                        imagePanel = new ImagePanel(img);
-                                    } else {
-                                        imagePanel.updateImage(img);
-                                    }
-                                    imagePanel.setBounds(5, 5, 640, 480);
-                                    imagePanel.setBorder(border);
-                                    imagePanel.setForeground(Color.black);
-                                    panel.add(imagePanel);
-                                    imagePanel.repaint();
-                                    //label.getGraphics().drawImage(img, 0, 0, null);
-                                    idx = 0;
-
-                                    System.out.println("saved " + count);//displayImage()
-                                } else {
-                                    contents[idx] = (byte) ch;
-                                    idx++;
-                                }
-                                if (img != null) {
-                                    break;
-                                }
-                            } while (true);
-
-                        } catch (
-                                UnknownHostException ex) {
-                            ex.printStackTrace();
-                        } catch (
-                                IOException ex) {
-                            ex.printStackTrace();
-                        }
-
-                    }
-
-                });
-                readImage2.start();
-
+                        getImage();
 
             }
         });
@@ -592,17 +406,26 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 x = confidencetxt.getText();
-                if (imagePanel.s != null && x != null && img != null) {
-                    try {
-                        output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                        output.println("TAKE|PAT|" + "{" + "\"bBox\":" + imagePanel.s + "," + "\"confi\":" + x + "}");
-                        JOptionPane.showMessageDialog(frame4, "Send Successfully");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                } else {
-                    JOptionPane.showMessageDialog(frame4, "Please make sure the parameter or confidence is set");
+                if(x != null){
+                    float y = Float.parseFloat(x);
+                    x= String.valueOf(y);
                 }
+                if(service.client != null){
+                    if (imagePanel.s != null && x != null && img != null) {
+                        try {
+                            output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                            output.println("TAKE|PAT|" + "{" + "\"bBox\":" + imagePanel.s + "," + "\"confi\":" + x + "}");
+                            JOptionPane.showMessageDialog(frame4, "Send Successfully");
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(frame4, "Please make sure the parameter or confidence is set");
+                    }
+                }else {
+                    JOptionPane.showMessageDialog(frame4, "Please make sure the connection is connected");
+                }
+
             }
         });
 
@@ -618,61 +441,16 @@ public class QualityCheckUserInterface1 {
         run.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = false;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("RUN|PAT");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                Thread readMessage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            String contents = "";
-                            do {
-                                if (stop == true) {
-                                    break;
-                                }
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-                                    System.out.print("return");
-                                    return;
-                                }
-                                if (ch == '|') {
-                                    System.out.println("Location: " + contents);//displayImage()
-                                    contents = "";
-                                } else {
-                                    char c = (char) ch;
-                                    contents = contents + c;
-                                }
-                            } while (true);
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                readMessage.start();
+                getRun();
             }
         });
 
-        final JButton stopb = new JButton("Stop");
-        stopb.setBounds(380, 490, 70, 30);
-        stopb.addActionListener(new ActionListener() {
+        final JButton stopB = new JButton("Stop");
+        stopB.setBounds(380, 490, 70, 30);
+        stopB.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = true;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("STOP");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                sendStop();
             }
         });
 
@@ -690,7 +468,7 @@ public class QualityCheckUserInterface1 {
         panel.add(exit);
         panel.add(label1);
         panel.add(getImage);
-        panel.add(stopb);
+        panel.add(stopB);
         panel.add(send);
         panel.add(confidence);
         panel.add(confidencetxt);
@@ -700,7 +478,7 @@ public class QualityCheckUserInterface1 {
     }
 
 
-//barframe
+    //bar Frame
 
     public void BarFrame() {
         Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
@@ -719,9 +497,18 @@ public class QualityCheckUserInterface1 {
         JLabel location = new JLabel("Location:");
         location.setBounds(50, 60, 80, 30);
 
-        final JTextField textField = new JTextField();
+        textField = new JTextField();
         textField.setBounds(140, 60, 150, 30);
         textField.setEditable(false);
+
+        final JButton stopB = new JButton("Stop");
+        stopB.setBounds(110, 130, 70, 30);
+        stopB.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+                sendStop();
+            }
+        });
 
 
         JButton run = new JButton("Run");
@@ -729,63 +516,10 @@ public class QualityCheckUserInterface1 {
         run.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = false;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("RUN|BCR");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Thread readMessage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            String contents = "";
-                            do {
-                                if (stop == true) {
-                                    break;
-                                }
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-                                    System.out.print("return\n");
-                                    return;
-                                }
-                                if (ch == '|') {
-                                    System.out.println("Location: " + contents);//displayImage()
-                                    // textField.setText(contents);
-                                    contents = "";
-                                } else {
-                                    char c = (char) ch;
-                                    contents = contents + c;
-                                }
-                            } while (true);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                readMessage.start();
+                getRun();
             }
         });
 
-        final JButton stop = new JButton("Stop");
-        stop.setBounds(110, 130, 70, 30);
-        stop.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent actionEvent) {
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("STOP");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        });
 
         JButton exit = new JButton("Exit");
         exit.setBounds(210, 130, 70, 30);
@@ -797,7 +531,7 @@ public class QualityCheckUserInterface1 {
         });
 
         frame1.add(panel);
-        panel.add(stop);
+        panel.add(stopB);
         panel.add(location);
         panel.add(textField);
         panel.add(run);
@@ -825,7 +559,7 @@ public class QualityCheckUserInterface1 {
         JLabel location = new JLabel("Location:");
         location.setBounds(50, 60, 80, 30);
 
-        final JTextField textField = new JTextField();
+        textField = new JTextField();
         textField.setBounds(140, 60, 150, 30);
         textField.setEditable(false);
 
@@ -835,48 +569,7 @@ public class QualityCheckUserInterface1 {
         run.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = false;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("RUN|CIR");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Thread readMessage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            String contents = "";
-                            do {
-                                if (stop == true) {
-                                    break;
-                                }
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-                                    System.out.print("return");
-                                    return;
-                                }
-                                if (ch == '|') {
-                                    System.out.println("Location: " + contents);//displayImage()
-                                    textField.setText(contents);
-                                    contents = "";
-                                } else {
-                                    char c = (char) ch;
-                                    contents = contents + c;
-                                }
-                            } while (true);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                });
-                readMessage.start();
-
+                getRun();
             }
         });
 
@@ -885,12 +578,7 @@ public class QualityCheckUserInterface1 {
         stop.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("STOP");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                sendStop();
             }
         });
 
@@ -923,23 +611,21 @@ public class QualityCheckUserInterface1 {
         frame3.setLocation(d.width / 2 - frame3.getSize().width / 2,
                 d.height / 2 - frame3.getSize().height / 2);
 
-        final JPanel panel = new JPanel();
+        panel = new JPanel();
         panel.setBounds(0, 0, 755, 530);
         panel.setLayout(null);
 
 
         final Border border = BorderFactory.createLineBorder(Color.black, 3);
-//        //label = new ImagePanel("/home/ur/sdk/sdk-1.6.1/socketclient/src/main/resources/impl/pic.jpg");
 
 
-        ImageIcon icon = new ImageIcon("/home/ur/Desktop/NEW ur cap/qc_urcap/target/QC-1.0-SNAPSHOT.urcap");
+        final ImageIcon icon = new ImageIcon("/home/ur/Desktop/NEW ur cap/qc_urcap/src/main/resources/com/jazari/QC/impl/main.png");
 
         final JLabel label1 = new JLabel();
         label1.setBounds(5, 5, 640, 480);
         label1.setBorder(border);
         label1.setForeground(Color.black);
         label1.setIcon(icon);
-        //label.setFont(label.getFont().deriveFont(Font.BOLD, 20));
 
         JButton getImage = new JButton("Get Image");
         getImage.setBounds(20, 490, 110, 30);
@@ -947,72 +633,7 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 label1.disable();
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("SEND");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-
-                Thread readImage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-
-                            byte[] contents = new byte[MAX_SIZE];
-                            int idx = 0;
-
-                            do {
-                                img = null;
-                                int ch = 0;
-                                ch = in.read();
-
-                                if (ch == -1) {
-//                    System.out.println("\nEnd"+contents.length);
-                                    // System.out.print("return");
-                                    return;
-                                }
-
-                                if (ch == ',') {
-                                    //System.out.println("EOI");
-                                    contents[idx] = '\0';
-                                    byte[] imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(new String(contents));
-                                    img = ImageIO.read(new ByteArrayInputStream(imageBytes));
-                                    if (imagePanel == null) {
-                                        imagePanel = new ImagePanel(img);
-                                    } else {
-                                        imagePanel.updateImage(img);
-                                    }
-                                    imagePanel.setBounds(5, 5, 640, 480);
-                                    imagePanel.setBorder(border);
-                                    imagePanel.setForeground(Color.black);
-                                    panel.add(imagePanel);
-                                    imagePanel.revalidate();
-                                    imagePanel.repaint();
-                                    //label.getGraphics().drawImage(img, 0, 0, null);
-                                    idx = 0;
-                                    System.out.println("saved " + count);//displayImage()
-                                } else {
-                                    contents[idx] = (byte) ch;
-                                    idx++;
-                                }
-                                if (img != null) {
-                                    break;
-                                }
-                            } while (true);
-
-                        } catch (UnknownHostException ex) {
-                            ex.printStackTrace();
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-
-                });
-                readImage.start();
-
+                getImage();
             }
         });
 
@@ -1023,74 +644,79 @@ public class QualityCheckUserInterface1 {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
                 x = txt.getText();
-                try {
-                    if (imagePanel.s1 != null && x != null) {
-                        output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                        output.println("TAKE|OCR|" + "{" + "\"region\":" + "[" + imagePanel.s1 + "]" + "," + "\"text\":" + "\"" + x + "\"" + "}");
-                        JOptionPane.showMessageDialog(frame3, "Send Successfully");
-                    } else {
-                        JOptionPane.showMessageDialog(frame3, "Please make sure the parameter or confidence is set");
+                if(service.client != null){
+                    try {
+                        if (imagePanel.s1 != null) {
+                            if (x != null) {
+                                output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                                output.println("TAKE|OCR|" + "{" + "\"region\":" + "[" + imagePanel.s1 + "]" + "," + "\"text\":" + "\"" + x + "\"" + "}");
+                                JOptionPane.showMessageDialog(frame3, "Send Successfully");
+                            }
+                        } else {
+                            JOptionPane.showMessageDialog(frame3, "Please make sure the parameter or confidence is set");
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
-                } catch (IOException e) {
-                    e.printStackTrace();
+                }else {
+                    JOptionPane.showMessageDialog(frame3, "Please make sure the connection is connected ");
+                }
+            }
+        });
+
+
+        JLabel text = new JLabel("Text:");
+        text.setBounds(680, 190, 90, 30);
+
+        txt = new JTextField();
+        txt.setBounds(650, 220, 100, 30);
+
+        checkBox = new JCheckBox();
+        checkBox.setBounds(650, 270, 100, 30);
+        checkBox.setText("<html><body>Object<br>Region</body></html>");
+        checkBox.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent itemEvent) {
+                selected = checkBox.isSelected();
+                System.out.println(selected);
+                if (imagePanel != null) {
+                    if (selected) {
+                        imagePanel.repaint();
+                        imagePanel.revalidate();
+                    } else {
+                        imagePanel.removeAllMouseListeners();
+                    }
                 }
 
             }
         });
 
 
-        JLabel text = new JLabel("Text:");
-        text.setBounds(650, 190, 90, 30);
+        final JCheckBox checkBoxText = new JCheckBox();
+        checkBoxText.setBounds(650, 310, 100, 30);
+        checkBoxText.setText("<html><body>Text<br>Region</body></html>");
+        checkBoxText.addItemListener(new ItemListener() {
+            @Override
+            public void itemStateChanged(ItemEvent itemEvent) {
+                boolean selected = checkBoxText.isSelected();
+                if (imagePanel != null) {
+                    if (selected) {
 
-        txt = new JTextField();
-        txt.setBounds(650, 230, 100, 30);
+                    } else {
+                        // imagePanel.removeAllMouseListeners();
+                    }
+                }
+            }
+        });
+
 
         JButton run = new JButton("Run");
         run.setBounds(300, 490, 70, 30);
         run.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = false;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("RUN|OCR");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                Thread readMessage = new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            in = new InputStreamReader(service.client.getInputStream());
-                            int count = 0;
-                            String contents = "";
-                            do {
-                                if (stop == true) {
-                                    break;
-                                }
-                                int ch = 0;
-                                ch = in.read();
+                getRun();
 
-                                if (ch == -1) {
-                                    System.out.print("return");
-                                    return;
-                                }
-                                if (ch == '|') {
-                                    System.out.println("Location: " + contents);//displayImage()
-                                    contents = "";
-                                } else {
-                                    char c = (char) ch;
-                                    contents = contents + c;
-                                }
-                            } while (true);
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                });
-                readMessage.start();
 
             }
         });
@@ -1100,13 +726,7 @@ public class QualityCheckUserInterface1 {
         stopb.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
-                stop = true;
-                try {
-                    output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
-                    output.println("STOP");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                sendStop();
             }
         });
 
@@ -1128,11 +748,255 @@ public class QualityCheckUserInterface1 {
         panel.add(stopb);
         panel.add(send);
         panel.add(text);
+        panel.add(checkBox);
+        panel.add(checkBoxText);
         panel.add(txt);
         frame3.setVisible(true);
         frame3.setEnabled(true);
 
     }
+
+
+
+    //Receive image from server
+    public void getImage(){
+        //send
+        if(service.client!= null){
+            try {
+                output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                output.println("SEND");
+
+            } catch (
+                    IOException ex) {
+                ex.printStackTrace();
+            }
+            //receive image in new thread
+            Thread readImage2 = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+
+                        in = new InputStreamReader(service.client.getInputStream());
+                        int count = 0;
+
+                        byte[] contents = new byte[MAX_SIZE];
+                        int idx = 0;
+
+                        do {
+                            img = null;
+                            int ch = 0;
+                            ch = in.read();
+
+                            if (ch == -1) {
+//                    System.out.println("\nEnd"+contents.length);
+                                // System.out.print("return");
+                                return;
+                            }
+
+                            if (ch == ',') {
+                                //System.out.println("EOI");
+                                contents[idx] = '\0';
+                                byte[] imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(new String(contents));
+                                 img = ImageIO.read(new ByteArrayInputStream(imageBytes));
+                                final Border border = BorderFactory.createLineBorder(Color.black, 3);
+                                //ImageIO.write(img, "jpg", new File("/home/ur/Desktop/NEW ur cap/check/src/main/resources/out.jpg"));
+                                if (imagePanel == null) {
+                                    imagePanel = new ImagePanel(img);
+                                } else {
+                                    imagePanel.updateImage(img);
+                                }
+                                imagePanel.setBounds(5, 5, 640, 480);
+                                imagePanel.setBorder(border);
+                                imagePanel.setForeground(Color.black);
+                                panel.add(imagePanel);
+                                imagePanel.repaint();
+                                //label.getGraphics().drawImage(img, 0, 0, null);
+                                idx = 0;
+
+                                System.out.println("saved " + count);//displayImage()
+                            } else {
+                                contents[idx] = (byte) ch;
+                                idx++;
+                            }
+                            if (img != null) {
+                                break;
+                            }
+                        } while (true);
+
+                    } catch (
+                            IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            });
+            readImage2.start();
+        }else {
+            //JOptionPane.showMessageDialog(frame, "Please make sure the connection is connected");
+        }
+
+    }
+
+
+
+    //Send stop to server
+    public void sendStop(){
+        //send
+        stop = true;
+        if(service.client != null){
+            try {
+                output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                output.println("STOP");
+                System.out.println("KKK"+stop);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }else{
+            JOptionPane.showMessageDialog(frame, "Please make sure the connection is connected");
+        }
+
+    }
+
+
+    // Send run to server and receive the information
+    public void getRun(){
+        //send
+        stop = false;
+        switch (task) {
+            case "RUN|PAT":
+            case "RUN|CLR":
+            case "RUN|BCR":
+            case "RUN|OCR":
+            case "RUN|CIR":
+                if(service.client!=null){
+                    try {
+                        output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                        output.println(task);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+
+
+                //receive in new thread
+                    Thread readMessage = new Thread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                in = new InputStreamReader(service.client.getInputStream());
+                                int count = 0;
+                                String contents = "";
+                                boolean start = false;
+                                do {
+                                    if (stop == true) {
+                                        break;
+                                    }
+                                    int ch = 0;
+                                    ch = in.read();
+                                    if (ch == -1) {
+                                        System.out.print("return");
+                                        return;
+                                    }
+                                    if(start){
+                                        if (ch == '|') {
+                                            System.out.println("Location: " + contents);//displayLocation()
+                                            if(textField != null){
+                                                textField.setText(contents);
+                                            }
+                                            contents = "";
+                                        } else {
+                                            char c = (char) ch;
+                                            contents = contents + c;
+                                        }
+                                    }
+                                    if(ch == '|')
+                                        start =! start ;
+                                } while (true);
+                               // System.out.println("Exited");
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+                    readMessage.start();
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Please make sure the connection is connected");
+                }
+        }
+
+    }
+
+
+    public  void getColorImage(){
+        if(service.client != null){
+            try {
+                output = new PrintWriter(new OutputStreamWriter(service.client.getOutputStream()), true);
+                output.println("SEND");
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            //receive image in new thread
+            Thread readImage3 = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        in = new InputStreamReader(service.client.getInputStream());
+                        int count = 0;
+                        byte[] contents = new byte[MAX_SIZE];
+                        int idx = 0;
+
+                        do {
+                            img = null;
+                            int ch = 0;
+                            ch = in.read();
+
+                            if (ch == -1) {
+//                    System.out.println("\nEnd"+contents.length);
+                                //System.out.print("return");
+                                return;
+                            }
+
+                            if (ch == ',') {
+                                //System.out.println("EOI");
+                                contents[idx] = '\0';
+                                byte[] imageBytes = javax.xml.bind.DatatypeConverter.parseBase64Binary(new String(contents));
+                                img = ImageIO.read(new ByteArrayInputStream(imageBytes));
+                                //ImageIO.write(img, "jpg", new File("/home/ur/Desktop/NEW ur cap/check/src/main/resources/out.jpg"));
+                                img2 = deepCopy(img);
+
+                                final Border border = BorderFactory.createLineBorder(Color.black, 3);
+                                colorImagePanel = new ColorImagePanel(img);
+                                colorImagePanel.setBounds(5, 5, 640, 480);
+                                colorImagePanel.setBorder(border);
+                                colorImagePanel.setForeground(Color.black);
+                                panel.add(colorImagePanel);
+                                colorImagePanel.revalidate();
+                                colorImagePanel.repaint();
+                                //label.getGraphics().drawImage(img, 0, 0, null);
+                                idx = 0;
+                                //System.out.println("saved " + count);//displayImage()
+                            } else {
+                                contents[idx] = (byte) ch;
+                                idx++;
+                            }
+                            if (img != null) {
+                                break;
+                            }
+                        } while (true);
+
+                        System.out.println("Exit");
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+
+            });
+            readImage3.start();
+        }else {
+            JOptionPane.showMessageDialog(frame, "Please make sure the connection is connected");
+        }
+
+    }
+
+
 
     static BufferedImage deepCopy(BufferedImage bi) {
         ColorModel cm = bi.getColorModel();

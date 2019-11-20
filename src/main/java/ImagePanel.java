@@ -1,82 +1,107 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionAdapter;
+import java.awt.event.*;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 public class ImagePanel extends JPanel {
+
     private static final long serialVersionUID = 1L;
     public BufferedImage image;
     private Shape shape = null;
     public StringBuilder str = new StringBuilder();
     public String s, s1;
     Point startDrag, endDrag;
+    private boolean box;
+      int count;
 
 
     public void updateImage(BufferedImage img) {
         this.image = img;
+        shape = null;
+        count = 0;
+        //str.delete(0, str.length());
     }
 
-    //public ImagePanel(String inputImage) throws IOException {
-    public ImagePanel(final BufferedImage img) throws IOException {
+
+    public ImagePanel(final BufferedImage img) {
         image = img;
-        //image = ImageIO.read(new File("/home/ur/sdk/sdk-1.6.1/socketclient/src/main/resources/impl/pic.jpg"));
-        //image = ImageIO.read(new File(inputImage));
-        this.addMouseListener(new MouseAdapter() {
-            public void mousePressed(MouseEvent e) {
-                startDrag = new Point(e.getX(), e.getY());
-                endDrag = startDrag;
-                revalidate();
-                repaint();
-            }
 
-            int count = 0;
+                MouseAdapter mouseAdapter =new MouseAdapter() {
+                    public void mousePressed(MouseEvent e) {
+                        startDrag = new Point(e.getX(), e.getY());
+                        endDrag = startDrag;
+                        revalidate();
+                        repaint();
+                    }
+                    public void mouseReleased(MouseEvent e) {
+                        if (endDrag != null && startDrag != null) {
+                            try {
+                                shape = makeRectangle(startDrag.x, startDrag.y, e.getX(),
+                                        e.getY());
+                                int x, y, w, h;
+                                x = startDrag.x;
+                                w = e.getX();
+                                y = startDrag.y;
+                                h = e.getY();
+                                s = ("[" + x + "," + y + "," + w + "," + h + "]");
+                                System.out.println(s);
+                                startDrag = null;
+                                endDrag = null;
+                                revalidate();
+                                repaint();
+                            } catch (Exception e1) {
+                                e1.printStackTrace();
+                            }
 
-            public void mouseReleased(MouseEvent e) {
-                if (endDrag != null && startDrag != null) {
-                    try {
-                        shape = makeRectangle(startDrag.x, startDrag.y, e.getX(),
-                                e.getY());
-                        int x, y, w, h;
-                        x = startDrag.x;
-                        w = e.getX();
-                        y = startDrag.y;
-                        h = e.getY();
-                        s = ("[" + x + "," + y + "," + w + "," + h + "]");
-                        startDrag = null;
-                        endDrag = null;
+                        }
+                        count++;
+                        System.out.println(count);
+                        str.append(s);
+                        if (count == 1) {
+                            str.append(",");
+                        }
+                        s1 = str.toString();
+                        if (count == 2) {
+                            str.delete(0, str.length());
+                            count = 0;
+                        }
+                    }
+                };
+
+                MouseMotionAdapter mouseMotionAdapter = new MouseMotionAdapter() {
+                    public void mouseDragged(MouseEvent e) {
+                        endDrag = new Point(e.getX(), e.getY());
                         revalidate();
                         repaint();
 
-                    } catch (Exception e1) {
-                        e1.printStackTrace();
                     }
+                };
 
-                }
-                count++;
-                System.out.println(count);
-                str.append(s);
-                if (count == 1) {
-                    str.append(",");
-                }
-                s1 = str.toString();
-                if (count == 2) {
-                    str.delete(0, str.length());
-                    count = 0;
-                }
-            }
-        });
 
-        this.addMouseMotionListener(new MouseMotionAdapter() {
-            public void mouseDragged(MouseEvent e) {
-                endDrag = new Point(e.getX(), e.getY());
-                revalidate();
-                repaint();
+
+        this.addMouseListener(mouseAdapter);
+
+        this.addMouseMotionListener(mouseMotionAdapter);
+
+    }
+
+    public void removeAllMouseListeners(){
+
+        MouseListener[] mouseListeners = this.getMouseListeners();
+        if(mouseListeners!=null){
+            for (MouseListener mouseListener : mouseListeners) {
+                this.removeMouseListener(mouseListener);
             }
-        });
+        }
+
+        MouseMotionListener[] mouseMotionListeners = this.getMouseMotionListeners();
+        if(mouseMotionListeners!=null){
+            for (MouseMotionListener mouseMotionListener : mouseMotionListeners) {
+                this.removeMouseMotionListener(mouseMotionListener);
+            }
+        }
 
     }
 
@@ -111,4 +136,5 @@ public class ImagePanel extends JPanel {
         return new Rectangle2D.Float(Math.min(x1, x2), Math.min(y1, y2),
                 Math.abs(x1 - x2), Math.abs(y1 - y2));
     }
+
 }
